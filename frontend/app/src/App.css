@@ -1,42 +1,132 @@
+/* Paleta de colores SaludPlus: 
+   Azul Médico: #0056b3 
+   Fondo: #f4f7f6
+   Blanco: #ffffff
+*/
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f4f7f6;
+  color: #333333;
+}
+
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+.app-container {
+  width: 100%;
+  min-height: 100vh; /* Toma toda la altura de la pantalla */
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* Centra verticalmente */
+  align-items: center; /* Centra horizontalmente */
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+h1 {
+  color: #0056b3;
+  font-size: 2.5rem;
+  margin-bottom: 30px;
   text-align: center;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+/* Estilos de los botones para elegir rol */
+.botones-seleccion {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 30px;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.botones-seleccion button {
+  background-color: #ffffff;
+  color: #0056b3;
+  border: 2px solid #0056b3;
+  padding: 10px 30px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.botones-seleccion button:hover {
+  background-color: #0056b3;
+  color: #ffffff;
 }
 
-.card {
-  padding: 2em;
+/* Estilos de la tarjeta del formulario */
+.formulario-contenedor {
+  background-color: #ffffff;
+  padding: 40px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  text-align: left;
+  width: 100%; 
+  max-width: 500px;
 }
 
-.read-the-docs {
-  color: #888;
+.formulario-contenedor h2 {
+  color: #0056b3;
+  margin-top: 0;
+  margin-bottom: 25px;
+  text-align: center;
+  border-bottom: 2px solid #e0e0e0;
+  padding-bottom: 10px;
+}
+
+/* Estilos de los inputs y selects */
+.formulario-contenedor form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.formulario-contenedor input,
+.formulario-contenedor select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #cccccc;
+  border-radius: 6px;
+  font-size: 1rem;
+  box-sizing: border-box; /* Evita que el padding rompa el ancho */
+  transition: border-color 0.3s ease;
+}
+
+.formulario-contenedor input:focus,
+.formulario-contenedor select:focus {
+  outline: none;
+  border-color: #0056b3;
+  box-shadow: 0 0 5px rgba(0, 86, 179, 0.2);
+}
+
+.formulario-contenedor label {
+  font-weight: bold;
+  font-size: 0.9rem;
+  color: #555555;
+  margin-bottom: -10px; /* Acerca el label al input */
+}
+
+/* Estilo del botón principal de registro */
+.formulario-contenedor button[type="submit"] {
+  background-color: #0056b3;
+  color: #ffffff;
+  border: none;
+  padding: 15px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-top: 15px;
+  transition: background-color 0.3s ease;
+}
+
+.formulario-contenedor button[type="submit"]:hover {
+  background-color: #004494;
 }

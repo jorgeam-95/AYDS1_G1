@@ -6,6 +6,7 @@ function RegistroPaciente() {
     telefono: '', fechaNacimiento: '', fotografia: null,
     correo: '', contrasena: ''
   });
+  const [errorPassword, setErrorPassword] = useState('');
 
   const handleChange = (e) => {
     const { name, value, files } = e.target;
@@ -15,10 +16,21 @@ function RegistroPaciente() {
     });
   };
 
+  const validarContrasena = (password) => {
+    // Regex: Mínimo 8 caracteres, 1 mayúscula, 1 minúscula, 1 número
+    const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d\w\W]{8,}$/;
+    return regex.test(password);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log("Datos del Paciente:", formData);
-    // Aquí luego agregaremos la validación de la contraseña y el envío al Backend
+    if (!validarContrasena(formData.contrasena)) {
+      setErrorPassword('La contraseña debe tener mínimo 8 caracteres, una mayúscula, una minúscula y un número.');
+      return;
+    }
+    setErrorPassword('');
+    console.log("Datos a enviar del Paciente:", formData);
+    // Aquí irá tu conexión al backend (fetch o axios)
   };
 
   return (
@@ -37,14 +49,17 @@ function RegistroPaciente() {
 
         <input type="text" name="direccion" placeholder="Dirección" onChange={handleChange} required />
         <input type="tel" name="telefono" placeholder="Teléfono" onChange={handleChange} required />
+        
+        <label>Fecha de Nacimiento:</label>
         <input type="date" name="fechaNacimiento" onChange={handleChange} required />
         
         <label>Fotografía (Opcional):</label>
         <input type="file" name="fotografia" accept="image/*" onChange={handleChange} />
         
         <input type="email" name="correo" placeholder="Correo Electrónico" onChange={handleChange} required />
-        <input type="password" name="contrasena" placeholder="Contraseña" onChange={handleChange} required 
-               title="Mínimo 8 caracteres, una mayúscula, una minúscula y un número" />
+        
+        <input type="password" name="contrasena" placeholder="Contraseña" onChange={handleChange} required />
+        {errorPassword && <p style={{color: 'red', fontSize: '12px'}}>{errorPassword}</p>}
         
         <button type="submit">Registrar Paciente</button>
       </form>
