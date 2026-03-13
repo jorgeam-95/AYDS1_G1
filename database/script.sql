@@ -28,5 +28,20 @@ hora TIME,
 estado VARCHAR(50)
 );
 
+CREATE TABLE patients (
+    id SERIAL PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    apellido VARCHAR(100) NOT NULL,
+    dpi VARCHAR(13) UNIQUE NOT NULL,
+    genero VARCHAR(10) NOT NULL,
+    direccion VARCHAR(255) NOT NULL,
+    telefono VARCHAR(15) NOT NULL,
+    fecha_nacimiento DATE NOT NULL,
+    fotografia TEXT,
+    correo VARCHAR(255) UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    aprobado BOOLEAN DEFAULT FALSE,
+    activo BOOLEAN DEFAULT TRUE
+);
 
 select * from usuarios
