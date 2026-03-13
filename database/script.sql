@@ -40,8 +40,8 @@ CREATE TABLE patients (
     fotografia TEXT,
     correo VARCHAR(255) UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
-    aprobado BOOLEAN DEFAULT FALSE,
-    activo BOOLEAN DEFAULT TRUE
+    estado VARCHAR(20) DEFAULT 'pendiente'
 );
 
 select * from usuarios
+
