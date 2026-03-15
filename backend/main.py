@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from connexion.config import get_connection
@@ -10,6 +10,7 @@ import bcrypt
 
 from model.ladmin import Ladmin
 from model.LoginUser import LoginUser
+from model.AceptarUsuario import AceptarUsuario
 
 app = FastAPI(title="AYDS1 Backend")
 
@@ -172,3 +173,42 @@ def login_usuario(datos: LoginUser):
         )
     else:
         raise HTTPException(status_code=401, detail="Contraseña incorrecta")
+    
+
+@app.post("/admin/aprobar/usuario")
+def aceptar_usuario(datos: AceptarUsuario):
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        query = """"""
+
+        if (datos.tipo == "medico"):
+            query = """
+                    UPDATE medicos
+                    SET aprobado = true
+                    WHERE dpi = %s
+                    """
+        else:
+            query = """
+                    UPDATE patients
+                    SET aprobado = true
+                    WHERE dpi = %s
+                    """
+            
+        cursor.execute(query, (datos.dpi,))
+        conn.commit()
+
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+        return JSONResponse(
+                status_code=200,
+                content={"Resultado": "Usuario Activado con exito",}
+            )
+    
+    finally:
+        cursor.execute(query, (datos.dpi,))
+        conn.commit()
+
