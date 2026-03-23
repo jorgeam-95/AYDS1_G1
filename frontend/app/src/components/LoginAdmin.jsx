@@ -1,4 +1,5 @@
 import { useState } from 'react';
+export const API_URL = import.meta.env.VITE_URL_BASE;
 
 function LoginAdmin() {
   // Controla en qué paso de la autenticación estamos (1 o 2)
@@ -25,7 +26,7 @@ function LoginAdmin() {
   };
 
   // Simula el envío del Paso 1
-  const handleSubmitPaso1 = (e) => {
+  const handleSubmitPaso1 = async (e) => {
     e.preventDefault();
     if (!credenciales.usuario || !credenciales.contrasena) {
       setError('Por favor ingrese usuario y contraseña.');
@@ -33,11 +34,24 @@ function LoginAdmin() {
     }
     
     setError('');
-    console.log("Validando credenciales en backend:", credenciales);
+
+    const response  = await fetch(`${API_URL}/login/admin`,{
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        "correo": credenciales.usuario,
+        "contrasena": credenciales.contrasena
+      })
+    })
     
-    // AQUÍ IRÁ TU PETICIÓN AL BACKEND
-    // Si el backend responde que el usuario/pass son correctos, pasamos al Paso 2:
-    setPaso(2); 
+    if (response.status == 200) {
+      alert("Login correcto")
+      setPaso(2); 
+    } else {
+      alert("Login incorrecto")
+    }
+
+
   };
 
   // Simula el envío del Paso 2 (Validación del archivo)
@@ -55,18 +69,28 @@ function LoginAdmin() {
       return;
     }
 
-    // Leer el contenido del archivo de texto
     const reader = new FileReader();
-    reader.onload = (evento) => {
+    reader.onload = async (evento) => {
       const contenidoEncriptado = evento.target.result;
       console.log("Contenido leído del archivo:", contenidoEncriptado);
       
       setError('');
       
-      // AQUÍ IRÁ TU SEGUNDA PETICIÓN AL BACKEND
-      // Debes enviar "contenidoEncriptado" a tu API para que lo compare 
-      // con la segunda contraseña guardada en la base de datos.
-      alert("¡Autenticación de 2 pasos completada con éxito en el Frontend!");
+      const response  = await fetch(`${API_URL}/login/admin/file/encript`,{
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          "passwordEncript": contenidoEncriptado
+        })
+      })
+      
+      if (response.status == 200) {
+        alert("ARCHIVO CORECTO")
+      } else {
+        alert("ARCHIVO INCORRECTO")
+      }
+
+      //alert("¡Autenticación de 2 pasos completada con éxito en el Frontend!");
     };
     
     // Le indicamos al lector que procese el archivo como texto
@@ -76,7 +100,6 @@ function LoginAdmin() {
   return (
     <div className="formulario-contenedor">
       {paso === 1 ? (
-        // INTERFAZ DEL PASO 1: USUARIO Y CONTRASEÑA
         <>
           <h2>Acceso Administrativo</h2>
           <p style={{textAlign: 'center', color: '#555', marginBottom: '20px'}}>Paso 1: Ingrese sus credenciales</p>
