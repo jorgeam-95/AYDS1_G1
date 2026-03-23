@@ -1,4 +1,5 @@
 import { useState } from 'react';
+export const API_URL = import.meta.env.VITE_URL_BASE;
 
 function RegistroMedico() {
   const [formData, setFormData] = useState({
@@ -22,7 +23,7 @@ function RegistroMedico() {
     return regex.test(password);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validarContrasena(formData.contrasena)) {
       setErrorPassword('La contraseña debe tener mínimo 8 caracteres, una mayúscula, una minúscula y un número.');
@@ -30,7 +31,51 @@ function RegistroMedico() {
     }
     setErrorPassword('');
     console.log("Datos a enviar del Médico:", formData);
-    // Aquí irá tu conexión al backend (fetch o axios)
+
+    let fotografiaBase64 = null;
+    if (formData.fotografia) {
+      fotografiaBase64 = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(formData.fotografia);
+      });
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/api/auth/register-medico`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              nombre: formData.nombre ,
+              apellido: formData.apellido,
+              dpi: formData.dpi,
+              fecha_nacimiento: formData.fechaNacimiento,
+              genero: formData.genero,
+              direccion: formData.direccion ,
+              telefono: formData.telefono,
+              fotografia: fotografiaBase64,
+              numero_colegiado: formData.numeroColegiado,
+              especialidad: formData.especialidad,
+              direccion_clinica: formData.direccionClinica,
+              correo: formData.correo,
+              password: formData.contrasena
+            })
+          });
+
+          const data = await response.json();
+          console.log(formData.fotografia);
+
+          if (!response.ok) {
+            setErrorPassword('Error al registrar');
+            return;
+          }
+    
+          alert('Paciente registrado correctamente! Tu cuenta está pendiente de aprobación.');
+        
+        } catch (error) {
+          console.log(error);
+        }
+
   };
 
   return (

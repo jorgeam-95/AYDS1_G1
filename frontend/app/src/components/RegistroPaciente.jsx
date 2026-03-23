@@ -1,4 +1,5 @@
 import { useState } from 'react';
+export const API_URL = import.meta.env.VITE_URL_BASE;
 
 function RegistroPaciente() {
   const [formData, setFormData] = useState({
@@ -31,7 +32,6 @@ function RegistroPaciente() {
     }
     setErrorPassword('');
 
-    // Convertir la foto a base64 si existe
     let fotografiaBase64 = null;
     if (formData.fotografia) {
       fotografiaBase64 = await new Promise((resolve) => {
@@ -42,7 +42,7 @@ function RegistroPaciente() {
     }
 
     try {
-      const response = await fetch('http://localhost:8000/api/auth/register-patient', {
+      const response = await fetch(`${API_URL}/api/auth/register-patient`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
