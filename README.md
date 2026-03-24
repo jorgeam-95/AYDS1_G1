@@ -17,12 +17,14 @@ postgresql
 
 # Daily Scrum – Grupo 1 (Sprint 1)
 ## Día 2 — 10/03/2026
-Nombre	¿Qué hice ayer?	¿Qué haré hoy?	Impedimentos
-Luis Fernando Gomez — 201801391	Configuré endpoint de registro de paciente, integración con bcrypt y estructura del controlador	Completar validaciones, control de duplicados y pruebas unitarias	Ninguno
-Francisco Javier Cetino Mendez — 202006716	Diseñé formulario de registro paciente con estructura completa	Agregar validaciones de campos y conectar con backend	Ninguno
-Adriana Lucia Ojeda Rivas — 202000363	Diseñé formulario de registro médico con campos requeridos	Agregar validación de fotografía obligatoria y campos médicos	Ninguno
-Jorge Rolando Ambrosio Perez — 201700408	Configuré backend y conexión base de datos	Implementar endpoint registro médico con validaciones	Ninguno
-Henry Alexander García Montufar — 201407049	Diseñé modelo entidad-relación inicial	Crear migraciones y validar integridad	Ninguno
+| Nombre                                      | ¿Qué hice ayer?                                                                                 | ¿Qué haré hoy?                                                    | Impedimentos |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ------------ |
+| Luis Fernando Gomez — 201801391             | Configuré endpoint de registro de paciente, integración con bcrypt y estructura del controlador | Completar validaciones, control de duplicados y pruebas unitarias | Ninguno      |
+| Francisco Javier Cetino Mendez — 202006716  | Diseñé formulario de registro paciente con estructura completa                                  | Agregar validaciones de campos y conectar con backend             | Ninguno      |
+| Adriana Lucia Ojeda Rivas — 202000363       | Diseñé formulario de registro médico con campos requeridos                                      | Agregar validación de fotografía obligatoria y campos médicos     | Ninguno      |
+| Jorge Rolando Ambrosio Perez — 201700408    | Configuré backend y conexión base de datos                                                      | Implementar endpoint registro médico con validaciones             | Ninguno      |
+| Henry Alexander García Montufar — 201407049 | Diseñé modelo entidad-relación inicial                                                          | Crear migraciones y validar integridad                            | Ninguno      |
+
 ## Día 3 — 11/03/2026
 Nombre	¿Qué hice ayer?	¿Qué haré hoy?	Impedimentos
 Luis Fernando Gomez — 201801391	Endpoint de registro paciente completo con encriptación	Implementar login paciente y validación de aprobación	Ninguno
