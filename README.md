@@ -696,3 +696,16 @@ El sistema **SaludPlus** es una plataforma diseñada para gestionar el proceso d
 #Diagrama Entidad-Relación
 
 ![Diagrama1](img/ER.png)
+
+---
+
+Tablero Kanban
+
+Inicio de proyecto:
+![Tablero1](img/Captura1.png)
+
+Durante el proyecto:
+![Tablero2](img/Captura2.png)
+
+Finalización del proyecto:
+![Tablero3](img/Captura3.png)
