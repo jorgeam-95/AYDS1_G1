@@ -1,6 +1,10 @@
 # Backend
 /backend/app
-
+/backend/.env
+/backend/__pycache__
+/backend/connexion/__pycache__
+/backend/model/__pycache__
+/backend/Security/__pycache__
 
 # Frontend
 # Logs
