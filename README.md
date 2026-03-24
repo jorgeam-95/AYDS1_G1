@@ -702,10 +702,10 @@ El sistema **SaludPlus** es una plataforma diseñada para gestionar el proceso d
 Tablero Kanban
 
 Inicio de proyecto:
-![Tablero1](img/Captura1.png)
+![Tablero1](img/Captura1.jpeg)
 
 Durante el proyecto:
-![Tablero2](img/Captura2.png)
+![Tablero2](img/Captura2.jpeg)
 
 Finalización del proyecto:
-![Tablero3](img/Captura3.png)
+![Tablero3](img/Captura3.jpeg)
