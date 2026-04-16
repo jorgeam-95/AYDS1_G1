@@ -1,7 +1,10 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 export const API_URL = import.meta.env.VITE_URL_BASE;
 
 function LoginAdmin() {
+  const navigate = useNavigate();
+
   // Controla en qué paso de la autenticación estamos (1 o 2)
   const [paso, setPaso] = useState(1);
   
@@ -45,7 +48,9 @@ function LoginAdmin() {
     })
     
     if (response.status == 200) {
-      alert("Login correcto")
+      const data = await response.json();
+      localStorage.setItem("token", data.acces_token);
+      localStorage.setItem("rol", data.rol)
       setPaso(2); 
     } else {
       alert("Login incorrecto")
@@ -85,7 +90,7 @@ function LoginAdmin() {
       })
       
       if (response.status == 200) {
-        alert("ARCHIVO CORECTO")
+        navigate("/admin/dashboard");
       } else {
         alert("ARCHIVO INCORRECTO")
       }
