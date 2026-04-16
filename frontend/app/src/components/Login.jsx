@@ -1,6 +1,9 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+export const API_URL = import.meta.env.VITE_URL_BASE;
 
 function Login({ irARegistro }) {
+  const navigate = useNavigate();
   const [credenciales, setCredenciales] = useState({
     correo: '',
     contrasena: ''
@@ -14,20 +17,42 @@ function Login({ irARegistro }) {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Simulación de validación inicial
     if (!credenciales.correo || !credenciales.contrasena) {
       setErrorAuth('Por favor ingrese su correo y contraseña.');
       return;
     }
     
     setErrorAuth('');
-    console.log("Intentando iniciar sesión con:", credenciales);
-    
-    // Aquí irá tu petición al backend. 
-    // Recuerda: el backend debe validar si el usuario ya fue aprobado por el administrador.
+
+    const response  = await fetch(`${API_URL}/login`,{
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            "correo": credenciales.correo,
+            "contrasena": credenciales.contrasena
+          })
+    })
+
+    if (response.status == 200) {
+      const data = await response.json();
+      localStorage.setItem("token", data.acces_token);
+      localStorage.setItem("rol", data.rol);
+
+      if ( data.rol == "medico" ){
+        navigate("/medico/dashboard");
+      }else if(data.rol == "paciente" ){
+        navigate("/paciente/dashboard");
+      }
+
+    } else {
+      const data = await response.json();
+      console.log( data );
+    }
+
+
   };
 
   return (
