@@ -5,6 +5,7 @@
 /backend/connexion/__pycache__
 /backend/model/__pycache__
 /backend/Security/__pycache__
+/frontend/app/.env
 
 # Frontend
 # Logs

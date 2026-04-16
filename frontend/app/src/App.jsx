@@ -22,9 +22,9 @@ function App() {
           
           <button onClick={() => setVista('loginAdmin')} style={{ width: '250px', backgroundColor: '#333', borderColor: '#333', color: 'white' }}>Administrador</button>
           {/* BOTÓN TEMPORAL PARA VER TU NUEVA PANTALLA */}
-          <button onClick={() => setVista('aprobarUsuarios')} style={{ width: '300px', backgroundColor: '#28a745', borderColor: '#28a745', color: 'white', marginTop: '20px' }}>
+          {/* <button onClick={() => setVista('aprobarUsuarios')} style={{ width: '300px', backgroundColor: '#28a745', borderColor: '#28a745', color: 'white', marginTop: '20px' }}>
             [Test] Ver Panel de Aprobación
-          </button>
+          </button> */}
         </div>
       )}
 

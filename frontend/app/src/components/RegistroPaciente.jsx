@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Link } from "react-router-dom";
 export const API_URL = import.meta.env.VITE_URL_BASE;
 
 function RegistroPaciente() {
+  const [ registroExitoso, setRegistroExitoso ] = useState(false);
   const [formData, setFormData] = useState({
     nombre: '', apellido: '', dpi: '', genero: '', direccion: '',
     telefono: '', fechaNacimiento: '', fotografia: null,
@@ -66,12 +68,38 @@ function RegistroPaciente() {
         return;
       }
 
-      alert('Paciente registrado correctamente! Tu cuenta está pendiente de aprobación.');
+      setRegistroExitoso(true);
+      //alert('Paciente registrado correctamente! Tu cuenta está pendiente de aprobación.');
     
     } catch (error) {
       setErrorPassword('No se pudo conectar con el servidor. Verifica que esté corriendo. el backend');
     }
   };
+
+  if (registroExitoso) {
+    return (
+      <div className="formulario-contenedor">
+        <h2>Registro exitoso</h2>
+        
+        <p style={{ marginTop: '15px', color: '#555' }}>
+          Tu cuenta ha sido enviada al administrador para su aprobación.
+        </p>
+
+        <Link 
+          to="/" 
+          style={{
+            display: "inline-block",
+            marginTop: "20px",
+            color: "#0056b3",
+            textDecoration: "underline",
+            cursor: "pointer"
+          }}
+        >
+          Volver al inicio
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="formulario-contenedor">

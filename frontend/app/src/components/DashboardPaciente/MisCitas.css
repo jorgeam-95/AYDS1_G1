@@ -1,0 +1,111 @@
+
+.mis-citas-container {
+    padding: 20px;
+}
+
+.tabla-citas {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+.tabla-citas th,
+.tabla-citas td {
+    border: 1px solid #ddd;
+    padding: 10px;
+    text-align: center;
+}
+
+.tabla-citas th {
+    background-color: #f4f6f9;
+}
+
+/* Estados */
+.estado {
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-weight: bold;
+    color: white;
+}
+
+.estado.pendiente {
+    background-color: #ffc107;
+}
+
+.estado.confirmada {
+    background-color: #17a2b8;
+}
+
+.estado.cancelada {
+    background-color: #dc3545;
+}
+
+.estado.completada {
+    background-color: #28a745;
+}
+
+/* Botones */
+.btn-detalles {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.btn-detalles:hover {
+    background-color: #0056b3;
+}
+
+.btn-cerrar {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 15px;
+}
+
+/* Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    width: 420px;
+    max-width: 90%;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.detalle-receta {
+    background: #e8f5e9;
+    padding: 10px;
+    border-radius: 8px;
+    margin-top: 10px;
+}
+
+.detalle-cancelacion {
+    background: #fdecea;
+    padding: 10px;
+    border-radius: 8px;
+    margin-top: 10px;
+}
+
+.mensaje-error {
+    color: red;
+    font-weight: bold;
+}
