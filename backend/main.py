@@ -2,10 +2,12 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from connexion.config import get_connection
+from psycopg2.extras import execute_values
 
 from db import Base, engine
 import bcrypt
 from Security.security import hash_password, verify_password
+from Security.token_jwt import crear_token
 
 from model.ladmin import Ladmin
 from model.LoginUser import LoginUser
@@ -13,6 +15,11 @@ from model.AceptarUsuario import AceptarUsuario
 from model.AdminFileEcnript import TxtEccript
 from model.RegistroPaciente import PatientCreate
 from model.RegistroMedico import MedicoCreate
+from model.RegistroHorarios import RegistroHorario
+from model.Idmedico import IdMedico
+from model.AgendarCita import AgendarCita
+from model.RecetaRequest import RecetaRequest
+from model.CancelarCitaRequest import CancelarCitaRequest
 
 app = FastAPI(title="AYDS1 Backend")
 
@@ -57,9 +64,18 @@ def login_admin(datos: Ladmin):
         raise HTTPException(status_code=401, detail="Administrador no encontrado")
 
     if bcrypt.checkpw(datos.contrasena.encode(), admin[1].encode()):
+        token = crear_token ( {
+            "user" : "administrador",
+            "rol" : "admin"
+        } ) 
+
         return JSONResponse(
             status_code=200,
-            content={"mensaje": "Login correcto"}
+            content={
+                "mensaje": "Login correcto",
+                "acces_token" : token,
+                "rol" : "admin"
+                }
         )
     else:
         raise HTTPException(status_code=401, detail="Contraseña incorrecta")
@@ -156,64 +172,83 @@ def login_usuario(datos: LoginUser):
     conn = get_connection()
     cursor = conn.cursor()
 
-    query = """"""
-
-    if (datos.tipo == "medico"):
-        query = """
-                SELECT correo, password_hash, aprobado, activo
+    querymedicos = """SELECT correo, password_hash, aprobado, activo
                 FROM medicos 
-                WHERE correo = %s
-                """
-    else:
-         query = """
-                SELECT correo, password_hash, aprobado, activo
+                WHERE correo = %s"""
+    
+    querypacientes = """SELECT correo, password_hash, aprobado, activo
                 FROM patients 
-                WHERE correo = %s
-                """
+                WHERE correo = %s"""
 
-    cursor.execute(query, (datos.correo,))
-    usuario = cursor.fetchone()
+    cursor.execute(querymedicos, (datos.correo,))
+    usuariomedicos = cursor.fetchone()
+    cursor.execute(querypacientes, (datos.correo,))
+    usuariopacientes = cursor.fetchone()
 
     cursor.close()
     conn.close()
 
-    if not usuario:
+    if (not usuariomedicos) and (not usuariopacientes):
         raise HTTPException(status_code=401, detail="Usuario no encontrado")
 
-    if bcrypt.checkpw(datos.contrasena.encode(), usuario[1].encode()):
-        return JSONResponse(
-            status_code=200,
-            content={"mensaje": "Login correcto",
-                     "aprobado": usuario[2],
-                     "activo": usuario[3]}
+    if (usuariomedicos):
+        if bcrypt.checkpw(datos.contrasena.encode(), usuariomedicos[1].encode()):
+            token = crear_token ( {
+                "user" : usuariomedicos[0],
+                "rol" : "medico",
+                "aprobado" : usuariomedicos[2],
+                "activo" : usuariomedicos[3]
+            } ) 
+
+            return JSONResponse(
+                status_code=200,
+                content={"mensaje": "Login correcto",
+                        "acces_token" : token,
+                        "rol" : "medico"}
         )
-    else:
-        raise HTTPException(status_code=401, detail="Contraseña incorrecta")
+        else:
+            raise HTTPException(status_code=401, detail="Contraseña incorrecta")
+
+    if (usuariopacientes):
+        if bcrypt.checkpw(datos.contrasena.encode(), usuariopacientes[1].encode()):
+                token = crear_token ( {
+                    "user" : usuariopacientes[0],
+                    "rol" : "paciente",
+                    "aprobado" : usuariopacientes[2],
+                    "activo" : usuariopacientes[3]
+                } ) 
+
+                return JSONResponse(
+                    status_code=200,
+                    content={"mensaje": "Login correcto",
+                            "acces_token" : token,
+                            "rol" : "paciente"}
+            )
+        else:
+            raise HTTPException(status_code=401, detail="Contraseña incorrecta")
     
 
 @app.post("/admin/aprobar/usuario")
 def aceptar_usuario(datos: AceptarUsuario):
-
     try:
         conn = get_connection()
         cursor = conn.cursor()
 
         query = """"""
-
         if (datos.tipo == "medico"):
             query = """
                     UPDATE medicos
                     SET aprobado = true
-                    WHERE dpi = %s
+                    WHERE correo = %s
                     """
         else:
             query = """
                     UPDATE patients
                     SET aprobado = true
-                    WHERE dpi = %s
+                    WHERE correo = %s
                     """
             
-        cursor.execute(query, (datos.dpi,))
+        cursor.execute(query, (datos.correo,))
         conn.commit()
 
         if cursor.rowcount == 0:
@@ -223,10 +258,9 @@ def aceptar_usuario(datos: AceptarUsuario):
                 status_code=200,
                 content={"Resultado": "Usuario Activado con exito",}
             )
-    
     finally:
-        cursor.execute(query, (datos.dpi,))
-        conn.commit()
+        cursor.close()
+        conn.close()
 
 @app.post("/api/auth/register-patient")
 def register_patient(patient: PatientCreate):
@@ -339,6 +373,584 @@ def register_medico(medico: MedicoCreate):
             "aprobado": False,
             "activo": True
         }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/medico/registrar/horario")
+def registerhorario(registrohorario: RegistroHorario):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT dpi FROM medicos WHERE correo = %s",
+            (registrohorario.correo,)
+        )
+        result = cursor.fetchone()
+        if not result:
+            raise HTTPException(
+                status_code=404,
+                detail="Médico no encontrado"
+            )
+        dpi = result[0]
+
+        query = """ 
+        INSERT INTO horarios_medico(dpi, dia_semana, hora_inicio, hora_fin)
+        VALUES %s
+        ON CONFLICT DO NOTHING;"""
+
+        valores = [
+            (dpi, dia, registrohorario.hora_inicio, registrohorario.hora_fin )
+            for dia in registrohorario.dias_semana
+        ]
+
+        execute_values(cursor, query, valores)
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.post("/medico/get/horario")
+def gethorarios(correo: AceptarUsuario):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # Obtener el DPI del médico
+        cursor.execute(
+            "SELECT dpi FROM medicos WHERE correo = %s",
+            (correo.correo,)
+        )
+        result = cursor.fetchone()
+
+        if not result:
+            raise HTTPException(
+                status_code=404,
+                detail="Médico no encontrado"
+            )
+
+        dpi = result[0]
+
+        # Consulta para obtener los horarios agrupados
+        query = """
+        SELECT 
+            hora_inicio,
+            hora_fin,
+            ARRAY_AGG(dia_semana ORDER BY dia_semana) AS dias_semana
+        FROM horarios_medico
+        WHERE dpi = %s
+        GROUP BY hora_inicio, hora_fin
+        ORDER BY hora_inicio;
+        """
+
+        cursor.execute(query, (dpi,))
+        horarios = cursor.fetchall()
+
+        cursor.close()
+        conn.close()
+        
+        resultado = []
+        for h in horarios:
+            resultado.append({
+                "hora_inicio": h[0].strftime("%H:%M"),
+                "hora_fin": h[1].strftime("%H:%M"),
+                "dias_semana": h[2],
+            })
+
+        return resultado
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.get("/paciente/get/horarios/medicos")
+def obtener_pacientes_pendientes():
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    query = """
+    SELECT DISTINCT
+        m.id,
+        m.nombre,
+        m.apellido,
+        m.especialidad,
+        m.direccion_clinica,
+        m.fotografia,
+        m.correo
+    FROM medicos m
+    INNER JOIN horarios_medico h 
+        ON m.dpi = h.dpi
+    WHERE m.aprobado = TRUE
+    AND m.activo = TRUE
+    ORDER BY m.nombre, m.apellido;
+    """
+
+    cursor.execute(query)
+    medicos = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    resultado = []
+    for m in medicos:
+        resultado.append({
+            "id": m[0],
+            "nombre": m[1],
+            "apellido": m[2],
+            "especialidad": m[3],   
+            "direccion_clinica": m[4],      
+            "fotografia": m[5],
+            "correo": m[6],
+        })
+
+    return resultado
+
+@app.post("/paciente/citas/agendar")
+def agendar_cita(data: AgendarCita):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT id FROM patients WHERE correo = %s",
+            (data.paciente_correo,)
+        )
+        paciente = cursor.fetchone()
+        if not paciente:
+            raise HTTPException(status_code=404, detail="Paciente no encontrado")
+        paciente_id = paciente[0]
+
+        cursor.execute(
+            "SELECT id FROM medicos WHERE correo = %s",
+            (data.medico_correo,)
+        )
+        medico = cursor.fetchone()
+        if not medico:
+            raise HTTPException(status_code=404, detail="Médico no encontrado")
+        medico_id = medico[0]
+
+        cursor.execute("""
+            SELECT 1 FROM citas
+            WHERE medico_id = %s AND fecha = %s AND hora = %s
+        """, (medico_id, data.fecha, data.hora))
+
+        if cursor.fetchone():
+            raise HTTPException(
+                status_code=400,
+                detail="Este horario ya no está disponible"
+            )
+
+        cursor.execute("""
+            INSERT INTO citas (usuario_id, medico_id, fecha, hora, estado_id)
+            VALUES (%s, %s, %s, %s, 1)
+            RETURNING id
+        """, (
+            paciente_id,
+            medico_id,
+            data.fecha,
+            data.hora,
+        ))
+
+        cita_id = cursor.fetchone()[0]
+        conn.commit()
+
+        cursor.close()
+        conn.close()
+
+        return {
+            "mensaje": "Cita agendada correctamente",
+            "cita_id": cita_id
+        }
+
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+@app.post("/paciente/get/horario")
+def getCitasPaciente(data: AceptarUsuario):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT id FROM patients WHERE correo = %s",(data.correo,))
+        paciente = cursor.fetchone()
+        if not paciente:
+            raise HTTPException(status_code=404, detail="Paciente no encontrado")
+        paciente_id = paciente[0]
+
+        cursor.execute("""
+                        SELECT 
+                            c.id,
+                            c.fecha,
+                            c.hora,
+                            ec.nombre AS estado,
+                            m.nombre,
+                            m.apellido,
+                            m.especialidad,
+                            m.direccion_clinica
+                        FROM citas c
+                        INNER JOIN estados_cita ec ON c.estado_id = ec.id
+                        INNER JOIN medicos m ON c.medico_id = m.id
+                        WHERE c.usuario_id = %s and ec.nombre = 'pendiente'
+                    """, (paciente_id,))
+
+        citas = cursor.fetchall()
+
+        cursor.close()
+        conn.close()
+
+        resultado = []
+        for c in citas:
+            resultado.append({
+                "id" : c[0],
+                "fecha": c[1],
+                "hora": c[2],
+                "estado": c[3],
+                "medico_nombre": c[4],   
+                "medico_apellido": c[5],      
+                "especialidad": c[6],
+                "direccion_clinica": c[7],
+            })
+        return resultado
+
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+@app.post("/medico/get/citas")
+def getCitasMedicos(data: AceptarUsuario):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT id FROM medicos WHERE correo = %s",(data.correo,))
+        paciente = cursor.fetchone()
+        if not paciente:
+            raise HTTPException(status_code=404, detail="Paciente no encontrado")
+        paciente_id = paciente[0]
+
+        cursor.execute("""
+                        SELECT 
+                            c.id,
+                            c.fecha,
+                            c.hora,
+                            ec.nombre AS estado,
+                            m.nombre,
+                            m.apellido,
+                            m.especialidad,
+                            m.direccion_clinica
+                        FROM citas c
+                        INNER JOIN estados_cita ec ON c.estado_id = ec.id
+                        INNER JOIN medicos m ON c.medico_id = m.id
+                        WHERE c.usuario_id = %s AND ec.nombre = 'pendiente' 
+                    """, (paciente_id,))
+
+        citas = cursor.fetchall()
+
+        cursor.close()
+        conn.close()
+
+        resultado = []
+        for c in citas:
+            resultado.append({
+                "id" : c[0],
+                "fecha": c[1],
+                "hora": c[2],
+                "estado": c[3],
+                "paciente_nombre": c[4],   
+                "paciente_apellido": c[5],      
+                "especialidad": c[6],
+                "direccion_clinica": c[7],
+            })
+        return resultado
+
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+@app.post("/medico/recetas/registrar")
+def registrar_receta(data: RecetaRequest):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            INSERT INTO recetas (cita_id, observaciones)
+            VALUES (%s, %s)
+            RETURNING id
+        """, (data.cita_id, data.observaciones))
+
+        receta_id = cursor.fetchone()[0]
+
+        for detalle in data.detalles:
+            cursor.execute("""
+                INSERT INTO receta_detalle (
+                    receta_id,
+                    medicamento,
+                    dosis,
+                    indicaciones
+                )
+                VALUES (%s, %s, %s, %s)
+            """, (
+                receta_id,
+                detalle.medicamento,
+                detalle.dosis,
+                detalle.indicaciones
+            ))
+
+        cursor.execute("""
+            UPDATE citas
+            SET estado_id = (
+                SELECT id FROM estados_cita
+                WHERE LOWER(nombre) = 'completada'
+            )
+            WHERE id = %s
+        """, (data.cita_id,))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return {"mensaje": "Receta registrada correctamente"}
+
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+@app.post("/medico/citas/cancelar")
+def cancelar_cita(data: CancelarCitaRequest):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT id FROM citas WHERE id = %s",
+            (data.cita_id,)
+        )
+        cita = cursor.fetchone()
+
+        if not cita:
+            raise HTTPException(
+                status_code=404,
+                detail="La cita no existe"
+            )
+
+        # Obtener el estado "cancelada"
+        cursor.execute(
+            "SELECT id FROM estados_cita WHERE LOWER(nombre) = 'cancelada'"
+        )
+        estado = cursor.fetchone()
+
+        if not estado:
+            raise HTTPException(
+                status_code=404,
+                detail="El estado 'cancelada' no está registrado"
+            )
+
+        estado_id = estado[0]
+
+        cursor.execute("""
+            UPDATE citas
+            SET estado_id = %s,
+                motivo_cancelacion = %s
+            WHERE id = %s
+        """, (
+            estado_id,
+            data.motivo_cancelacion,
+            data.cita_id
+        ))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return {"mensaje": "Cita cancelada correctamente"}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+@app.post("/medico/get/historial-citas")
+def obtener_historial_citas(data: AceptarUsuario):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        print(data.correo);
+
+        cursor.execute(
+            "SELECT id FROM medicos WHERE correo = %s",
+            (data.correo,)
+        )
+        medico = cursor.fetchone()
+
+        if not medico:
+            raise HTTPException(
+                status_code=404,
+                detail="Médico no encontrado"
+            )
+
+        medico_id = medico[0]
+        print(medico_id)
+
+        query = """
+        SELECT 
+        c.id,
+        p.nombre,
+        p.apellido,
+        c.fecha,
+        c.hora,
+        CASE 
+            WHEN LOWER(ec.nombre) = 'completada' THEN 'Atendida'
+            ELSE ec.nombre
+        END AS estado,
+        c.motivo_cancelacion,
+        r.observaciones,
+        COALESCE(
+            json_agg(
+                json_build_object(
+                    'medicamento', rd.medicamento,
+                    'dosis', rd.dosis,
+                    'indicaciones', rd.indicaciones
+                )
+            ) FILTER (WHERE rd.id IS NOT NULL),
+            '[]'
+        ) AS detalles
+        FROM citas c
+        INNER JOIN patients p ON c.usuario_id = p.id
+        INNER JOIN estados_cita ec ON c.estado_id = ec.id
+        LEFT JOIN recetas r ON r.cita_id = c.id
+        LEFT JOIN receta_detalle rd ON rd.receta_id = r.id
+        WHERE c.medico_id = %s
+        GROUP BY 
+            c.id,
+            p.nombre,
+            p.apellido,
+            c.fecha,
+            c.hora,
+            ec.nombre,
+            c.motivo_cancelacion,
+            r.observaciones
+        ORDER BY c.fecha DESC, c.hora DESC;
+        """
+
+        cursor.execute(query, (medico_id,))
+        citas = cursor.fetchall()
+
+        cursor.close()
+        conn.close()
+
+        resultado = []
+        for cita in citas:
+            resultado.append({
+                "id": cita[0],
+                "paciente_nombre": cita[1],
+                "paciente_apellido": cita[2],
+                "fecha": cita[3].isoformat(),
+                "hora": str(cita[4]),
+                "estado": cita[5],
+                "motivo_cancelacion": cita[6],
+                "observaciones": cita[7],
+                "detalles": cita[8] if cita[8] else []
+            })
+
+        return resultado
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+@app.post("/paciente/get/historial-citas")
+def obtener_historial_citas_paciente(data: AceptarUsuario):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT id FROM patients WHERE correo = %s",
+            (data.correo,)
+        )
+        paciente = cursor.fetchone()
+
+        if not paciente:
+            raise HTTPException(
+                status_code=404,
+                detail="Paciente no encontrado"
+            )
+
+        paciente_id = paciente[0]
+
+        query = """
+            SELECT 
+            c.id,
+            m.nombre,
+            m.apellido,
+            c.fecha,
+            c.hora,
+            CASE 
+                WHEN LOWER(ec.nombre) = 'completada' THEN 'Atendida'
+                ELSE ec.nombre
+            END AS estado,
+            c.motivo_cancelacion,
+            r.observaciones,
+            COALESCE(
+                json_agg(
+                    json_build_object(
+                        'medicamento', rd.medicamento,
+                        'dosis', rd.dosis,
+                        'indicaciones', rd.indicaciones
+                    )
+                ) FILTER (WHERE rd.id IS NOT NULL),
+                '[]'
+            ) AS detalles
+            FROM citas c
+            INNER JOIN medicos m ON c.medico_id = m.id
+            INNER JOIN estados_cita ec ON c.estado_id = ec.id
+            LEFT JOIN recetas r ON r.cita_id = c.id
+            LEFT JOIN receta_detalle rd ON rd.receta_id = r.id
+            WHERE c.usuario_id = %s
+            AND LOWER(ec.nombre) IN ('completada', 'cancelada')
+            GROUP BY 
+                c.id,
+                m.nombre,
+                m.apellido,
+                c.fecha,
+                c.hora,
+                ec.nombre,
+                c.motivo_cancelacion,
+                r.observaciones
+            ORDER BY c.fecha DESC, c.hora DESC;
+        """
+
+        cursor.execute(query, (paciente_id,))
+        citas = cursor.fetchall()
+
+        resultado = []
+        for cita in citas:
+            resultado.append({
+                "id": cita[0],
+                "medico_nombre": cita[1],
+                "medico_apellido": cita[2],
+                "fecha": cita[3].isoformat(),
+                "hora": str(cita[4]),
+                "estado": cita[5],
+                "motivo_cancelacion": cita[6],
+                "observaciones": cita[7],
+                "detalles": cita[8] if cita[8] else []
+            })
+
+        cursor.close()
+        conn.close()
+
+        return resultado
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
