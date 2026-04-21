@@ -20,6 +20,8 @@ from model.Idmedico import IdMedico
 from model.AgendarCita import AgendarCita
 from model.RecetaRequest import RecetaRequest
 from model.CancelarCitaRequest import CancelarCitaRequest
+from model.CalificarPacienteRequest import CalificarPacienteRequest
+from model.ReportarPacienteRequest import ReportarPacienteRequest
 
 app = FastAPI(title="AYDS1 Backend")
 
@@ -784,8 +786,6 @@ def obtener_historial_citas(data: AceptarUsuario):
         conn = get_connection()
         cursor = conn.cursor()
 
-        print(data.correo);
-
         cursor.execute(
             "SELECT id FROM medicos WHERE correo = %s",
             (data.correo,)
@@ -793,53 +793,67 @@ def obtener_historial_citas(data: AceptarUsuario):
         medico = cursor.fetchone()
 
         if not medico:
-            raise HTTPException(
-                status_code=404,
-                detail="Médico no encontrado"
-            )
+            raise HTTPException(404, "Médico no encontrado")
 
         medico_id = medico[0]
-        print(medico_id)
 
         query = """
-        SELECT 
-        c.id,
-        p.nombre,
-        p.apellido,
-        c.fecha,
-        c.hora,
-        CASE 
-            WHEN LOWER(ec.nombre) = 'completada' THEN 'Atendida'
-            ELSE ec.nombre
-        END AS estado,
-        c.motivo_cancelacion,
-        r.observaciones,
-        COALESCE(
-            json_agg(
-                json_build_object(
-                    'medicamento', rd.medicamento,
-                    'dosis', rd.dosis,
-                    'indicaciones', rd.indicaciones
-                )
-            ) FILTER (WHERE rd.id IS NOT NULL),
-            '[]'
-        ) AS detalles
-        FROM citas c
-        INNER JOIN patients p ON c.usuario_id = p.id
-        INNER JOIN estados_cita ec ON c.estado_id = ec.id
-        LEFT JOIN recetas r ON r.cita_id = c.id
-        LEFT JOIN receta_detalle rd ON rd.receta_id = r.id
-        WHERE c.medico_id = %s
-        GROUP BY 
-            c.id,
-            p.nombre,
-            p.apellido,
-            c.fecha,
-            c.hora,
-            ec.nombre,
-            c.motivo_cancelacion,
-            r.observaciones
-        ORDER BY c.fecha DESC, c.hora DESC;
+            SELECT 
+                c.id,
+                p.nombre,
+                p.apellido,
+                c.fecha,
+                c.hora,
+
+                CASE 
+                    WHEN LOWER(ec.nombre) = 'completada' THEN 'Atendida'
+                    ELSE ec.nombre
+                END AS estado,
+
+                c.motivo_cancelacion,
+                r.observaciones,
+
+                EXISTS (
+                    SELECT 1 FROM calificaciones_paciente cp 
+                    WHERE cp.cita_id = c.id
+                ) AS ya_calificado,
+
+                EXISTS (
+                    SELECT 1 FROM reportes_paciente rp 
+                    WHERE rp.cita_id = c.id
+                ) AS ya_reportado,
+
+                COALESCE(
+                    json_agg(
+                        json_build_object(
+                            'medicamento', rd.medicamento,
+                            'dosis', rd.dosis,
+                            'indicaciones', rd.indicaciones
+                        )
+                    ) FILTER (WHERE rd.id IS NOT NULL),
+                    '[]'
+                ) AS detalles
+
+            FROM citas c
+            INNER JOIN patients p ON c.usuario_id = p.id
+            INNER JOIN estados_cita ec ON c.estado_id = ec.id
+            LEFT JOIN recetas r ON r.cita_id = c.id
+            LEFT JOIN receta_detalle rd ON rd.receta_id = r.id
+
+            WHERE c.medico_id = %s
+            AND LOWER(ec.nombre) IN ('completada', 'cancelada')
+
+            GROUP BY 
+                c.id,
+                p.nombre,
+                p.apellido,
+                c.fecha,
+                c.hora,
+                ec.nombre,
+                c.motivo_cancelacion,
+                r.observaciones
+
+            ORDER BY c.fecha DESC, c.hora DESC;
         """
 
         cursor.execute(query, (medico_id,))
@@ -849,22 +863,26 @@ def obtener_historial_citas(data: AceptarUsuario):
         conn.close()
 
         resultado = []
+
         for cita in citas:
             resultado.append({
                 "id": cita[0],
                 "paciente_nombre": cita[1],
                 "paciente_apellido": cita[2],
-                "fecha": cita[3].isoformat(),
+                "fecha": str(cita[3]),
                 "hora": str(cita[4]),
                 "estado": cita[5],
                 "motivo_cancelacion": cita[6],
                 "observaciones": cita[7],
-                "detalles": cita[8] if cita[8] else []
+                "ya_calificado": cita[8],
+                "ya_reportado": cita[9],
+                "detalles": cita[10] if cita[10] else []
             })
 
         return resultado
 
     except Exception as e:
+        print(e)
         raise HTTPException(status_code=500, detail=str(e))
     
 
@@ -953,4 +971,135 @@ def obtener_historial_citas_paciente(data: AceptarUsuario):
         return resultado
 
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+@app.post("/medico/calificar-paciente")
+def calificar_paciente(data: CalificarPacienteRequest):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT 
+                c.id,
+                c.medico_id,
+                c.usuario_id
+            FROM citas c
+            INNER JOIN estados_cita ec ON c.estado_id = ec.id
+            WHERE c.id = %s AND LOWER(ec.nombre) = 'completada'
+        """, (data.cita_id,))
+        
+        cita = cursor.fetchone()
+
+        if not cita:
+            raise HTTPException(
+                status_code=400,
+                detail="Solo se pueden calificar citas completadas"
+            )
+
+        cita_id = cita[0]
+        medico_id = cita[1]
+        paciente_id = cita[2]
+
+        cursor.execute("""
+            SELECT 1 
+            FROM calificaciones_paciente 
+            WHERE cita_id = %s
+        """, (cita_id,))
+
+        if cursor.fetchone():
+            raise HTTPException(
+                status_code=400,
+                detail="El paciente ya fue calificado en esta cita"
+            )
+
+        cursor.execute("""
+            INSERT INTO calificaciones_paciente (
+                cita_id,
+                medico_id,
+                paciente_id,
+                puntuacion,
+                comentario
+            )
+            VALUES (%s, %s, %s, %s, %s)
+        """, (
+            cita_id,
+            medico_id,
+            paciente_id,
+            data.puntuacion,
+            data.comentario
+        ))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return {"mensaje": "Paciente calificado correctamente"}
+
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.post("/medico/reportar-paciente")
+def reportar_paciente(data: ReportarPacienteRequest):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT 
+                c.id,
+                c.medico_id,
+                c.usuario_id
+            FROM citas c
+            INNER JOIN estados_cita ec ON c.estado_id = ec.id
+            WHERE c.id = %s AND LOWER(ec.nombre) = 'completada'
+        """, (data.cita_id,))
+        
+        cita = cursor.fetchone()
+
+        if not cita:
+            raise HTTPException(
+                status_code=400,
+                detail="Solo se pueden reportar citas completadas"
+            )
+
+        cita_id, medico_id, paciente_id = cita
+
+        cursor.execute("""
+            SELECT 1 
+            FROM reportes_paciente 
+            WHERE cita_id = %s
+        """, (cita_id,))
+
+        if cursor.fetchone():
+            raise HTTPException(
+                status_code=400,
+                detail="El paciente ya fue reportado en esta cita"
+            )
+
+        cursor.execute("""
+            INSERT INTO reportes_paciente (
+                cita_id,
+                medico_id,
+                paciente_id,
+                motivo
+            )
+            VALUES (%s, %s, %s, %s)
+        """, (
+            cita_id,
+            medico_id,
+            paciente_id,
+            data.motivo
+        ))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return {"mensaje": "Paciente reportado correctamente"}
+
+    except Exception as e:
+        print(e)
         raise HTTPException(status_code=500, detail=str(e))
