@@ -1,14 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from backend.Security.security import verify_password
+from Security.security import verify_password
 from db import get_db
 from models import Patient
 from schemas import PatientRegister
-from backend.Security.security import hash_password
+from Security.security import hash_password
 import secrets
 import smtplib
+import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from dotenv import load_dotenv
 
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
@@ -91,8 +93,9 @@ def login(correo: str, password: str, token_ingresado: str = None, db: Session =
     }
 
 def enviar_correo_verificacion(destinatario, token):
-    remitente = "saludplus_oficial@tudominio.com"
-    password_app = "tu_password_de_aplicacion" # Usa variables de entorno (.env)
+    # Usamos las variables del .env para que tus 5 compañeros no tengan que editar esto
+    remitente = os.getenv("EMAIL_USER")
+    password_app = os.getenv("EMAIL_PASS").strip()
 
     msg = MIMEMultipart()
     msg['From'] = f"Salud Plus <{remitente}>"
@@ -101,18 +104,23 @@ def enviar_correo_verificacion(destinatario, token):
 
     html = f"""
     <html>
-        <body>
-            <img src="URL_DE_TU_LOGO" width="150" alt="Salud Plus Logo">
-            <h2>¡Bienvenido a Salud Plus!</h2>
-            <p>Para completar tu registro, utiliza el siguiente token en tu primer inicio de sesión:</p>
-            <h1 style="color: #2c3e50;">{token}</h1>
-            <p><b>Instrucciones:</b> Ingresa a la plataforma, coloca tus credenciales y pega este código cuando se te solicite.</p>
+        <body style="font-family: Arial, sans-serif; text-align: center; border: 1px solid #ddd; padding: 20px;">
+            <img src="https://i.ibb.co/6R0D5tV/logo-saludplus.png" width="150" alt="Salud Plus Logo">
+            <h2 style="color: #2c3e50;">¡Bienvenido a Salud Plus!</h2>
+            <p>Utiliza el siguiente código para completar tu registro:</p>
+            <div style="background: #f4f4f4; padding: 10px; font-size: 24px; font-weight: bold;">
+                {token}
+            </div>
+            <p><b>Instrucciones:</b> Ingresa este código cuando se te solicite en la plataforma.</p>
         </body>
     </html>
     """
     msg.attach(MIMEText(html, 'html'))
 
-    # Configuración SMTP (Ejemplo con Gmail)
-    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-        server.login(remitente, password_app)
-        server.send_message(msg)
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(remitente, password_app)
+            server.send_message(msg)
+        print(f"✅ Correo enviado exitosamente a {destinatario}")
+    except Exception as e:
+        print(f"❌ Error en auth.py: {e}")

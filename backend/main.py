@@ -20,6 +20,12 @@ from model.Idmedico import IdMedico
 from model.AgendarCita import AgendarCita
 from model.RecetaRequest import RecetaRequest
 from model.CancelarCitaRequest import CancelarCitaRequest
+from auth import enviar_correo_verificacion
+import secrets
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import os
 
 app = FastAPI(title="AYDS1 Backend")
 
@@ -167,7 +173,7 @@ def obtener_pacientes_pendientes():
 
 
 @app.post("/login")
-def login_usuario(datos: LoginUser):
+def login_usuario(datos: LoginUser, token_ingresado: str = None):
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -278,11 +284,12 @@ def register_patient(patient: PatientCreate):
             raise HTTPException(status_code=400, detail="El DPI ya está registrado")
 
         hashed_password = hash_password(patient.password)
+        token_val = secrets.token_hex(3).upper()
 
         cursor.execute("""
             INSERT INTO patients 
-            (nombre, apellido, dpi, genero, direccion, telefono, fecha_nacimiento, fotografia, correo, password_hash, aprobado, activo)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            (nombre, apellido, dpi, genero, direccion, telefono, fecha_nacimiento, fotografia, correo, password_hash, aprobado, activo, token_validacion, es_verificado)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id;
         """, (
             patient.nombre,
@@ -295,25 +302,30 @@ def register_patient(patient: PatientCreate):
             patient.fotografia,
             patient.correo,
             hashed_password,
-            False,  
-            True    
+            False,     # aprobado
+            True,      # activo
+            token_val, # token_validacion
+            False      # es_verificado 
         ))
 
         new_id = cursor.fetchone()[0]
 
         conn.commit()
-        cursor.close()
-        conn.close()
+        enviar_correo_verificacion(patient.correo, token_val)
 
         return {
-            "message": "Paciente registrado correctamente",
+            "message": "Paciente registrado correctamente. Se ha enviado un token a su correo.",
             "id": new_id,
             "aprobado": False,
-            "activo": True
+            "es_verificado": False
         }
 
-    except psycopg2.Error as e:
+    except Exception as e:
+        if conn: conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
     
 
 @app.post("/api/auth/register-medico")
@@ -954,3 +966,4 @@ def obtener_historial_citas_paciente(data: AceptarUsuario):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
