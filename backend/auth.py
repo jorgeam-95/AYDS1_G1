@@ -1,10 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from backend.Security.security import verify_password
+from Security.security import verify_password
 from db import get_db
 from models import Patient
 from schemas import PatientRegister
-from backend.Security.security import hash_password
+from Security.security import hash_password
+import secrets
+import smtplib
+import os
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from dotenv import load_dotenv
 
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
@@ -20,6 +26,7 @@ def register_patient(data: PatientRegister, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="El DPI ya está registrado")
 
     password_hashed = hash_password(data.password)
+    token_generado = secrets.token_hex(3).upper() # Crea algo como 'A1B2C3'
 
     new_patient = Patient(
         nombre=data.nombre,
@@ -32,6 +39,7 @@ def register_patient(data: PatientRegister, db: Session = Depends(get_db)):
         fotografia=data.fotografia,
         correo=data.correo,
         password_hash=password_hashed,
+        token_validacion=token_generado,
         aprobado=False,
         activo=True
     )
@@ -39,6 +47,8 @@ def register_patient(data: PatientRegister, db: Session = Depends(get_db)):
     db.add(new_patient)
     db.commit()
     db.refresh(new_patient)
+
+    enviar_correo_verificacion(data.correo, token_generado)
 
     return {
         "message": "Paciente registrado correctamente",
@@ -53,28 +63,64 @@ def register_patient(data: PatientRegister, db: Session = Depends(get_db)):
     }
 
 @router.post("/login")
-def login(correo: str, password: str, db: Session = Depends(get_db)):
+def login(correo: str, password: str, token_ingresado: str = None, db: Session = Depends(get_db)):
 
     patient = db.query(Patient).filter(Patient.correo == correo).first()
 
-    if not patient:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciales incorrectas"
-        )
+   # Validación 1: Credenciales básicas
+    if not patient or not verify_password(password, patient.password_hash):
+        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
 
-    if not verify_password(password, patient.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciales incorrectas"
-        )
+    # TAREA 4: Validación de Aprobación del Administrador
+    if not patient.es_aprobado:
+        raise HTTPException(status_code=403, detail="Tu cuenta aún no ha sido aprobada por el administrador")
+
+    # TAREA 3: Validación de Token (Primer inicio de sesión)
+    if not patient.es_verificado:
+        if not token_ingresado:
+            raise HTTPException(status_code=400, detail="Se requiere el token de verificación para el primer inicio de sesión")
+        
+        if token_ingresado != patient.token_validacion:
+            raise HTTPException(status_code=400, detail="El token de verificación es incorrecto")
+        
+        # Si el token es correcto, marcamos como verificado para siempre
+        patient.es_verificado = True
+        db.commit()
 
     return {
         "message": "Login exitoso",
-        "patient": {
-            "id": patient.id,
-            "nombre": patient.nombre,
-            "apellido": patient.apellido,
-            "correo": patient.correo
-        }
+        "user": {"id": patient.id, "nombre": patient.nombre, "correo": patient.correo}
     }
+
+def enviar_correo_verificacion(destinatario, token):
+    # Usamos las variables del .env para que tus 5 compañeros no tengan que editar esto
+    remitente = os.getenv("EMAIL_USER")
+    password_app = os.getenv("EMAIL_PASS").strip()
+
+    msg = MIMEMultipart()
+    msg['From'] = f"Salud Plus <{remitente}>"
+    msg['To'] = destinatario
+    msg['Subject'] = "Verifica tu cuenta - Salud Plus"
+
+    html = f"""
+    <html>
+        <body style="font-family: Arial, sans-serif; text-align: center; border: 1px solid #ddd; padding: 20px;">
+            <img src="https://i.ibb.co/6R0D5tV/logo-saludplus.png" width="150" alt="Salud Plus Logo">
+            <h2 style="color: #2c3e50;">¡Bienvenido a Salud Plus!</h2>
+            <p>Utiliza el siguiente código para completar tu registro:</p>
+            <div style="background: #f4f4f4; padding: 10px; font-size: 24px; font-weight: bold;">
+                {token}
+            </div>
+            <p><b>Instrucciones:</b> Ingresa este código cuando se te solicite en la plataforma.</p>
+        </body>
+    </html>
+    """
+    msg.attach(MIMEText(html, 'html'))
+
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(remitente, password_app)
+            server.send_message(msg)
+        print(f"✅ Correo enviado exitosamente a {destinatario}")
+    except Exception as e:
+        print(f"❌ Error en auth.py: {e}")
