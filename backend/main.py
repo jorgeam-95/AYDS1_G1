@@ -3,11 +3,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from connexion.config import get_connection
 from psycopg2.extras import execute_values
+import psycopg2
 
 from db import Base, engine
 import bcrypt
 from Security.security import hash_password, verify_password
 from Security.token_jwt import crear_token
+from fastapi.responses import FileResponse
+from fpdf import FPDF
+from datetime import datetime
+import os
 
 from model.ladmin import Ladmin
 from model.LoginUser import LoginUser
@@ -22,6 +27,8 @@ from model.RecetaRequest import RecetaRequest
 from model.CancelarCitaRequest import CancelarCitaRequest
 from model.CalificarPacienteRequest import CalificarPacienteRequest
 from model.ReportarPacienteRequest import ReportarPacienteRequest
+from model.CalificarMedicoRequest import CalificarMedicoRequest
+from model.ReportarMedicoRequest import ReportarMedicoRequest
 
 app = FastAPI(title="AYDS1 Backend")
 
@@ -1102,4 +1109,375 @@ def reportar_paciente(data: ReportarPacienteRequest):
 
     except Exception as e:
         print(e)
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+
+@app.post("/paciente/calificar-medico")
+def calificar_medico(data: CalificarMedicoRequest):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT id FROM patients WHERE correo = %s",
+            (data.correo,)
+        )
+        paciente = cursor.fetchone()
+
+        if not paciente:
+            raise HTTPException(status_code=404, detail="Paciente no encontrado")
+
+        paciente_id = paciente[0]
+
+        cursor.execute("""
+            SELECT c.id, c.medico_id, ec.nombre
+            FROM citas c
+            INNER JOIN estados_cita ec ON c.estado_id = ec.id
+            WHERE c.id = %s AND c.usuario_id = %s
+        """, (data.cita_id, paciente_id))
+
+        cita = cursor.fetchone()
+
+        if not cita:
+            raise HTTPException(status_code=404, detail="Cita no encontrada")
+
+        estado = cita[2].lower()
+        if estado != "completada":
+            raise HTTPException(status_code=400, detail="Solo se pueden calificar citas atendidas")
+
+        medico_id = cita[1]
+
+        cursor.execute(
+            "SELECT id FROM calificaciones_medicos WHERE cita_id = %s",
+            (data.cita_id,)
+        )
+        ya_existe = cursor.fetchone()
+
+        if ya_existe:
+            raise HTTPException(status_code=400, detail="Esta cita ya fue calificada")
+
+        cursor.execute("""
+            INSERT INTO calificaciones_medicos (cita_id, paciente_id, medico_id, estrellas, comentario)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (data.cita_id, paciente_id, medico_id, data.estrellas, data.comentario))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return {"mensaje": "Calificación guardada correctamente"}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+@app.post("/paciente/reportar-medico")
+def reportar_medico(data: ReportarMedicoRequest):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT id FROM patients WHERE correo = %s",
+            (data.correo,)
+        )
+        paciente = cursor.fetchone()
+
+        if not paciente:
+            raise HTTPException(status_code=404, detail="Paciente no encontrado")
+
+        paciente_id = paciente[0]
+
+        cursor.execute("""
+            SELECT c.id, c.medico_id, ec.nombre
+            FROM citas c
+            INNER JOIN estados_cita ec ON c.estado_id = ec.id
+            WHERE c.id = %s AND c.usuario_id = %s
+        """, (data.cita_id, paciente_id))
+
+        cita = cursor.fetchone()
+
+        if not cita:
+            raise HTTPException(status_code=404, detail="Cita no encontrada")
+
+        estado = cita[2].lower()
+        if estado != "completada":
+            raise HTTPException(status_code=400, detail="Solo se pueden reportar citas atendidas")
+
+        medico_id = cita[1]
+
+        cursor.execute("""
+            INSERT INTO reportes_medicos (cita_id, paciente_id, medico_id, categoria, motivo)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (data.cita_id, paciente_id, medico_id, data.categoria, data.motivo))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return {"mensaje": "Reporte enviado correctamente"}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+@app.get("/admin/calificaciones/medicos")
+def ver_calificacion_medicos():
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT 
+                m.id,
+                m.nombre,
+                m.apellido,
+                m.especialidad,
+                COALESCE(ROUND(AVG(cm.estrellas)::numeric, 2), 0) AS promedio
+            FROM medicos m
+            LEFT JOIN calificaciones_medicos cm
+                ON m.id = cm.medico_id
+            WHERE m.activo = TRUE
+            GROUP BY m.id, m.nombre, m.apellido, m.especialidad
+            ORDER BY promedio DESC, m.nombre ASC
+        """)
+
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        resultado = []
+        for r in rows:
+            resultado.append({
+                "id": r[0],
+                "nombre": r[1],
+                "apellido": r[2],
+                "especialidad": r[3],
+                "promedio": float(r[4])
+            })
+
+        return resultado
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.get("/admin/calificaciones/pacientes")
+def ver_calificacion_pacientes():
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT 
+                p.id,
+                p.nombre,
+                p.apellido,
+                COALESCE(ROUND(AVG(cp.estrellas)::numeric, 2), 0) AS promedio
+            FROM patients p
+            LEFT JOIN calificaciones_pacientes cp
+                ON p.id = cp.paciente_id
+            WHERE p.activo = TRUE
+            GROUP BY p.id, p.nombre, p.apellido
+            ORDER BY promedio DESC, p.nombre ASC
+        """)
+
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        resultado = []
+        for r in rows:
+            resultado.append({
+                "id": r[0],
+                "nombre": r[1],
+                "apellido": r[2],
+                "promedio": float(r[3])
+            })
+
+        return resultado
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+
+@app.get("/paciente/tratamiento/{cita_id}")
+def ver_tratamiento(cita_id: int):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT 
+                c.id,
+                c.fecha,
+                c.hora,
+                m.nombre,
+                m.apellido,
+                m.especialidad,
+                m.numero_colegiado,
+                r.observaciones,
+                COALESCE(
+                    json_agg(
+                        json_build_object(
+                            'medicamento', rd.medicamento,
+                            'dosis', rd.dosis,
+                            'indicaciones', rd.indicaciones
+                        )
+                    ) FILTER (WHERE rd.id IS NOT NULL),
+                    '[]'
+                ) AS detalles
+            FROM citas c
+            INNER JOIN medicos m ON c.medico_id = m.id
+            INNER JOIN estados_cita ec ON c.estado_id = ec.id
+            LEFT JOIN recetas r ON r.cita_id = c.id
+            LEFT JOIN receta_detalle rd ON rd.receta_id = r.id
+            WHERE c.id = %s
+            AND LOWER(ec.nombre) = 'completada'
+            GROUP BY 
+                c.id, c.fecha, c.hora,
+                m.nombre, m.apellido, m.especialidad,
+                m.numero_colegiado,
+                r.observaciones
+        """, (cita_id,))
+
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+        if not row:
+            raise HTTPException(status_code=404, detail="Tratamiento no encontrado")
+
+        return {
+            "cita_id": row[0],
+            "fecha": row[1].isoformat(),
+            "hora": str(row[2]),
+            "medico_nombre": row[3],
+            "medico_apellido": row[4],
+            "especialidad": row[5],
+            "numero_colegiado": row[6],
+            "diagnostico": row[7],
+            "medicamentos": row[8] if row[8] else []
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.get("/paciente/receta/pdf/{cita_id}")
+def imprimir_receta_pdf(cita_id: int):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT 
+                c.id,
+                c.fecha,
+                m.nombre,
+                m.apellido,
+                m.especialidad,
+                m.numero_colegiado,
+                r.observaciones,
+                COALESCE(
+                    json_agg(
+                        json_build_object(
+                            'medicamento', rd.medicamento,
+                            'dosis', rd.dosis,
+                            'indicaciones', rd.indicaciones
+                        )
+                    ) FILTER (WHERE rd.id IS NOT NULL),
+                    '[]'
+                ) AS detalles
+            FROM citas c
+            INNER JOIN medicos m ON c.medico_id = m.id
+            INNER JOIN estados_cita ec ON c.estado_id = ec.id
+            LEFT JOIN recetas r ON r.cita_id = c.id
+            LEFT JOIN receta_detalle rd ON rd.receta_id = r.id
+            WHERE c.id = %s
+            AND LOWER(ec.nombre) = 'completada'
+            GROUP BY 
+                c.id, c.fecha,
+                m.nombre, m.apellido, m.especialidad,
+                m.numero_colegiado,
+                r.observaciones
+        """, (cita_id,))
+
+        row = cursor.fetchone()
+
+        if not row:
+            cursor.close()
+            conn.close()
+            raise HTTPException(status_code=404, detail="Receta no encontrada")
+
+        detalles = row[7] if row[7] else []
+
+        os.makedirs("pdfs", exist_ok=True)
+        file_path = f"pdfs/receta_{cita_id}.pdf"
+
+        pdf = FPDF()
+        pdf.add_page()
+
+        pdf.set_font("Helvetica", "B", 18)
+        pdf.cell(0, 10, "SaludPlus", ln=True, align="C")
+
+        pdf.set_font("Helvetica", "", 11)
+        pdf.cell(0, 8, f"Fecha de emision: {datetime.now().strftime('%d/%m/%Y')}", ln=True)
+        pdf.cell(0, 8, "Telefono de contacto: 1234-5678", ln=True)
+
+        pdf.ln(5)
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "Datos del medico", ln=True)
+
+        pdf.set_font("Helvetica", "", 11)
+        pdf.cell(0, 8, f"Medico: {row[2]} {row[3]}", ln=True)
+        pdf.cell(0, 8, f"Especialidad: {row[4]}", ln=True)
+        pdf.cell(0, 8, f"No. colegiado: {row[5]}", ln=True)
+
+        pdf.ln(5)
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "Diagnostico / Observaciones", ln=True)
+
+        pdf.set_font("Helvetica", "", 11)
+        pdf.multi_cell(0, 8, str(row[6] or "Sin observaciones"))
+
+        pdf.ln(5)
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "Medicamentos", ln=True)
+
+        pdf.set_font("Helvetica", "", 10)
+
+        if len(detalles) == 0:
+            pdf.cell(0, 8, "No hay medicamentos registrados.", ln=True)
+        else:
+            for index, med in enumerate(detalles, start=1):
+                pdf.multi_cell(
+                    0,
+                    8,
+                    f"{index}. Medicamento: {med.get('medicamento', '')}\n"
+                    f"   Dosis: {med.get('dosis', '')}\n"
+                    f"   Indicaciones: {med.get('indicaciones', '')}"
+                )
+                pdf.ln(2)
+
+        pdf.ln(8)
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.cell(0, 8, "Firma / sello del medico", ln=True)
+
+        pdf.set_font("Helvetica", "", 11)
+        pdf.cell(0, 8, f"{row[2]} {row[3]}", ln=True)
+        pdf.cell(0, 8, f"{row[4]} - Colegiado {row[5]}", ln=True)
+
+        pdf.output(file_path)
+
+        cursor.close()
+        conn.close()
+
+        return FileResponse(
+            path=file_path,
+            media_type="application/pdf",
+            filename=f"receta_{cita_id}.pdf"
+        )
+
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
