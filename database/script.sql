@@ -45,3 +45,34 @@ CREATE TABLE patients (
 
 select * from usuarios
 
+CREATE TABLE IF NOT EXISTS calificaciones_medicos (
+    id SERIAL PRIMARY KEY,
+    cita_id INT UNIQUE NOT NULL,
+    paciente_id INT NOT NULL,
+    medico_id INT NOT NULL,
+    estrellas INT NOT NULL CHECK (estrellas >= 0 AND estrellas <= 5),
+    comentario TEXT,
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS reportes_medicos (
+    id SERIAL PRIMARY KEY,
+    cita_id INT NOT NULL,
+    paciente_id INT NOT NULL,
+    medico_id INT NOT NULL,
+    categoria VARCHAR(100) NOT NULL,
+    motivo TEXT NOT NULL,
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    estado VARCHAR(20) DEFAULT 'pendiente'
+);
+
+CREATE TABLE IF NOT EXISTS calificaciones_pacientes (
+    id SERIAL PRIMARY KEY,
+    cita_id INT UNIQUE NOT NULL,
+    paciente_id INT NOT NULL,
+    medico_id INT NOT NULL,
+    estrellas INT NOT NULL CHECK (estrellas >= 0 AND estrellas <= 5),
+    comentario TEXT,
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+

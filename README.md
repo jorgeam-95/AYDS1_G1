@@ -697,15 +697,72 @@ El sistema **SaludPlus** es una plataforma diseñada para gestionar el proceso d
 
 ![Diagrama1](img/ER.png)
 
+
+# Manual Técnico - SaludPlus 
+
+## 1. Introducción
+[cite_start]**SaludPlus** es una plataforma web integral diseñada para la modernización de la gestión de citas médicas. [cite_start]Este documento detalla la arquitectura, configuración y procesos técnicos necesarios para el despliegue del sistema.
+
 ---
 
-Tablero Kanban
+## 2. Arquitectura del Sistema
+[cite_start]El sistema se basa en una arquitectura de microservicios contenedorizados para garantizar la escalabilidad y consistencia entre entornos.
 
-Inicio de proyecto:
-![Tablero1](img/Captura1.jpeg)
+* [cite_start]**Frontend:** Aplicación web desarrollada con frameworks modernos (React/Vue/Angular).
+* [cite_start]**Backend:** API RESTful encargada de la lógica de negocio y comunicación con la base de datos.
+* [cite_start]**Base de Datos:** Almacenamiento persistente (Relacional o NoSQL).
+* [cite_start]**Contenedorización:** Uso de **Docker** y **Docker Compose** para orquestar los servicios.
 
-Durante el proyecto:
-![Tablero2](img/Captura2.jpeg)
+---
 
-Finalización del proyecto:
-![Tablero3](img/Captura3.jpeg)
+## 3. Requisitos de Instalación
+Para poner en marcha el proyecto, el entorno debe contar con:
+* [cite_start]**Docker & Docker Compose:** Necesarios para levantar los contenedores de frontend, backend y DB.
+* [cite_start]**Git:** Para la gestión de versiones siguiendo la estrategia **Git Flow**.
+* [cite_start]**Navegador Web:** Compatible con estándares modernos.
+
+---
+
+## 4. Configuración y Despliegue
+1. **Clonación del repositorio:**
+   ```bash
+   git clone [https://github.com/usuario/AYDS1_G#.git](https://github.com/usuario/AYDS1_G5.git)
+
+
+---
+
+### 2. Manual de Usuario
+
+```markdown
+# Manual de Usuario - SaludPlus 
+
+Bienvenido a la guía de uso de la plataforma **SaludPlus**, el sistema centralizado para la gestión eficiente de tus citas médicas.
+
+---
+
+## 1. Rol: Paciente 
+Como paciente, puedes gestionar tu salud de forma autónoma:
+* **Registro:** Crea tu cuenta ingresando datos como DPI, teléfono y correo.
+* **Búsqueda de Médicos:** Filtra a los profesionales por su especialidad.
+* **Gestión de Citas:** * Visualiza horarios disponibles filtrando por fecha.
+    * Programa citas evitando traslapes con otras consultas.
+    * Cancela citas activas desde tu panel personal.
+* **Historial:** Consulta tus chequeos pasados y los tratamientos recetados.
+
+---
+
+## 2. Rol: Médico 
+Herramientas para la administración de agenda profesional:
+* **Perfil Obligatorio:** Debe incluir fotografía, número de colegiado y dirección de clínica .
+* **Control de Horarios:** Define tus días y horas de atención. El sistema validará que no existan citas previas antes de permitir cambios de horario.
+* **Atención al Paciente:** Registra el tratamiento al finalizar cada consulta para que el paciente pueda verlo en su historial.
+* **Cancelaciones:** Si tienes un contratiempo, puedes cancelar la cita; el sistema enviará automáticamente un correo de disculpa al paciente.
+
+---
+
+## 3. Rol: Administrador 
+Supervisión y control total del sistema:
+* **Doble Autenticación:** Para ingresar, deberás subir el archivo de seguridad `auth2-ayd1.txt`.
+* **Gestión de Altas:** Aprueba o rechaza manualmente a nuevos médicos y pacientes antes de que puedan usar la plataforma.
+* **Mantenimiento:** Posibilidad de dar de baja a usuarios que infrinjan las normas de la clínica.
+* **Reportes Analíticos:** Generación de estadísticas sobre especialidades con más demanda y médicos con mayor flujo de pacientes
