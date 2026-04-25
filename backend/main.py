@@ -185,7 +185,7 @@ def login_usuario(datos: LoginUser):
                 FROM medicos 
                 WHERE correo = %s"""
     
-    querypacientes = """SELECT correo, password_hash, aprobado, activo
+    querypacientes = """SELECT correo, password_hash, aprobado, es_verificado 
                 FROM patients 
                 WHERE correo = %s"""
 
@@ -220,11 +220,17 @@ def login_usuario(datos: LoginUser):
 
     if (usuariopacientes):
         if bcrypt.checkpw(datos.contrasena.encode(), usuariopacientes[1].encode()):
+                
+                if not usuariopacientes[2]: 
+                    raise HTTPException(status_code=403, detail="Tu cuenta está pendiente de aprobación por el administrador")
+        
+                # Validación de Token/Verificación (401)
+                if not usuariopacientes[3]: # Ahora usuariopacientes[3] es 'es_verificado'
+                    raise HTTPException(status_code=401, detail="Debes verificar tu cuenta con el código enviado a tu correo")
+                
                 token = crear_token ( {
-                    "user" : usuariopacientes[0],
-                    "rol" : "paciente",
-                    "aprobado" : usuariopacientes[2],
-                    "activo" : usuariopacientes[3]
+                    "user": usuariopacientes[0],
+                    "rol": "paciente"
                 } ) 
 
                 return JSONResponse(
@@ -980,6 +986,27 @@ def obtener_historial_citas_paciente(data: AceptarUsuario):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
+@app.post("/api/auth/verify-token")
+def verificar_token(correo: str, token_ingresado: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    # Buscamos al usuario y su token
+    cursor.execute("SELECT token_validacion FROM patients WHERE correo = %s", (correo,))
+    resultado = cursor.fetchone()
+    
+    if not resultado or resultado[0] != token_ingresado:
+        cursor.close()
+        conn.close()
+        raise HTTPException(status_code=400, detail="Token incorrecto o expirado")
+    
+    # Si es correcto, lo marcamos como verificado
+    cursor.execute("UPDATE patients SET es_verificado = TRUE WHERE correo = %s", (correo,))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    
+    return {"message": "Cuenta verificada con éxito. Ahora espera la aprobación del admin."}
 
 @app.post("/medico/calificar-paciente")
 def calificar_paciente(data: CalificarPacienteRequest):
