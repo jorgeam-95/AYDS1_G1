@@ -4,6 +4,7 @@ import "./GestionCitasMedico.css";
 export const API_URL = import.meta.env.VITE_URL_BASE;
 
 const GestionCitasMedico = () => {
+    const [citasEnAtencion, setCitasEnAtencion] = useState([]);
     const [citas, setCitas] = useState([]);
     const [filtro, setFiltro] = useState("");
     const [modalAbierto, setModalAbierto] = useState(false);
@@ -16,6 +17,10 @@ const GestionCitasMedico = () => {
     const [detallesReceta, setDetallesReceta] = useState([
         { medicamento: "", dosis: "", indicaciones: "" }
     ]);
+
+    const iniciarAtencion = (cita) => {
+        setCitasEnAtencion([...citasEnAtencion, cita.id]);
+    };
 
     const token = localStorage.getItem("token");
 
@@ -170,18 +175,30 @@ const GestionCitasMedico = () => {
                                 <td>
                                     {cita.estado.toLowerCase() === "pendiente" && (
                                         <>
-                                            <button
-                                                className="btn-atender"
-                                                onClick={() => abrirModal(cita, "atender")}
-                                            >
-                                                Atender
-                                            </button>
-                                            <button
-                                                className="btn-cancelar"
-                                                onClick={() => abrirModal(cita, "cancelar")}
-                                            >
-                                                Cancelar
-                                            </button>
+                                            {!citasEnAtencion.includes(cita.id) ? (
+                                                <>
+                                                    <button
+                                                        className="btn-atender"
+                                                        onClick={() => iniciarAtencion(cita)}
+                                                    >
+                                                        Atender
+                                                    </button>
+
+                                                    <button
+                                                        className="btn-cancelar"
+                                                        onClick={() => abrirModal(cita, "cancelar")}
+                                                    >
+                                                        Cancelar
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <button
+                                                    className="btn-atender"
+                                                    onClick={() => abrirModal(cita, "atender")}
+                                                >
+                                                    Registrar Diagnóstico
+                                                </button>
+                                            )}
                                         </>
                                     )}
                                 </td>
