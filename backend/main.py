@@ -230,8 +230,10 @@ def login_usuario(datos: LoginUser):
                 
                 token = crear_token ( {
                     "user": usuariopacientes[0],
-                    "rol": "paciente"
-                } ) 
+                    "rol": "paciente",
+                    "aprobado": usuariopacientes[2],
+                    "activo": usuariopacientes[3]
+                } )
 
                 return JSONResponse(
                     status_code=200,
@@ -296,8 +298,8 @@ def register_patient(patient: PatientCreate):
 
         cursor.execute("""
             INSERT INTO patients 
-            (nombre, apellido, dpi, genero, direccion, telefono, fecha_nacimiento, fotografia, correo, password_hash, aprobado, activo)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            (nombre, apellido, dpi, genero, direccion, telefono, fecha_nacimiento, fotografia, dpi_pdf, correo, password_hash, aprobado, activo)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id;
         """, (
             patient.nombre,
@@ -308,6 +310,7 @@ def register_patient(patient: PatientCreate):
             patient.telefono,
             patient.fecha_nacimiento,
             patient.fotografia,
+            patient.dpi_pdf,
             patient.correo,
             hashed_password,
             False,  
@@ -355,8 +358,8 @@ def register_medico(medico: MedicoCreate):
         cursor.execute("""
             INSERT INTO medicos 
             (nombre, apellido, dpi, fecha_nacimiento, genero, direccion, telefono, fotografia,
-             numero_colegiado, especialidad, direccion_clinica, correo, password_hash, aprobado, activo)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            numero_colegiado, especialidad, direccion_clinica, correo, password_hash, aprobado, activo, cv_pdf)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id;
         """, (
             medico.nombre,
@@ -372,8 +375,9 @@ def register_medico(medico: MedicoCreate):
             medico.direccion_clinica,
             medico.correo,
             hashed_password,
-            False,  
-            True    
+            False,
+            True,
+            medico.cv_pdf
         ))
 
         new_id = cursor.fetchone()[0]
@@ -1506,5 +1510,57 @@ def imprimir_receta_pdf(cita_id: int):
             filename=f"receta_{cita_id}.pdf"
         )
 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/admin/reportes/top-medicos")
+def top_medicos():
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT 
+                m.id,
+                m.nombre,
+                m.apellido,
+                m.especialidad,
+                COUNT(c.id) AS total_citas
+            FROM medicos m
+            INNER JOIN citas c ON c.medico_id = m.id
+            INNER JOIN estados_cita ec ON c.estado_id = ec.id
+            WHERE LOWER(ec.nombre) = 'completada'
+            GROUP BY m.id, m.nombre, m.apellido, m.especialidad
+            ORDER BY total_citas DESC
+            LIMIT 10
+        """)
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return [{"id": r[0], "nombre": r[1], "apellido": r[2], "especialidad": r[3], "total_citas": r[4]} for r in rows]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/admin/reportes/citas-especialidad")
+def citas_por_especialidad():
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT 
+                m.especialidad,
+                COUNT(c.id) AS total,
+                SUM(CASE WHEN LOWER(ec.nombre) = 'completada' THEN 1 ELSE 0 END) AS atendidas,
+                SUM(CASE WHEN LOWER(ec.nombre) = 'cancelada' THEN 1 ELSE 0 END) AS canceladas
+            FROM citas c
+            INNER JOIN medicos m ON c.medico_id = m.id
+            INNER JOIN estados_cita ec ON c.estado_id = ec.id
+            GROUP BY m.especialidad
+            ORDER BY total DESC
+        """)
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return [{"especialidad": r[0], "total": r[1], "atendidas": r[2], "canceladas": r[3]} for r in rows]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
