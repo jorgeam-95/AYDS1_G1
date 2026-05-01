@@ -2,6 +2,7 @@ import React from 'react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Dashboard.css';
+import Reportes from './Reportes';
 
 
 import AprobarUsuarios from '../AprobarUsuarios';
@@ -19,6 +20,8 @@ const DashboardAdmin = ({ irA }) => {
         return <AprobarUsuarios></AprobarUsuarios>
       case "Dar de Baja":
         return <h2>Gestión de Citas</h2>;
+      case "Reportes":
+        return <Reportes />;
       default:
         return <h2>Bienvenido al Dashboard</h2>;
     }
@@ -47,6 +50,9 @@ const DashboardAdmin = ({ irA }) => {
         <button className="logout" onClick={handleLogout}>
           Cerrar sesión
         </button>
+        <button onClick={() => setSeccion("Reportes")}>
+          Reportes
+          </button>
       </div>
       <div className="contenido">
         {renderContenido()}
