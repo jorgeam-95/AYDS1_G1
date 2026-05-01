@@ -1,26 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from "react-router-dom";
 export const API_URL = import.meta.env.VITE_URL_BASE;
 
 function RegistroMedico() {
-  const [ registroExitoso, setRegistroExitoso ] = useState(false);
+  const [registroExitoso, setRegistroExitoso] = useState(false);
   const [formData, setFormData] = useState({
     nombre: '', apellido: '', dpi: '', fechaNacimiento: '', genero: '',
     direccion: '', telefono: '', fotografia: null, numeroColegiado: '',
-    especialidad: '', direccionClinica: '', correo: '', contrasena: ''
+    especialidad: '', direccionClinica: '', correo: '', contrasena: '',
+    cvPdf: null
   });
   const [errorPassword, setErrorPassword] = useState('');
 
   const handleChange = (e) => {
     const { name, value, files } = e.target;
-    setFormData({
-      ...formData,
-      [name]: files ? files[0] : value
-    });
+    setFormData({ ...formData, [name]: files ? files[0] : value });
   };
 
   const validarContrasena = (password) => {
-    // Regex: Mínimo 8 caracteres, 1 mayúscula, 1 minúscula, 1 número
     const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d\w\W]{8,}$/;
     return regex.test(password);
   };
@@ -32,7 +29,6 @@ function RegistroMedico() {
       return;
     }
     setErrorPassword('');
-    console.log("Datos a enviar del Médico:", formData);
 
     let fotografiaBase64 = null;
     if (formData.fotografia) {
@@ -43,70 +39,62 @@ function RegistroMedico() {
       });
     }
 
+    let cvPdfBase64 = null;
+    if (formData.cvPdf) {
+      cvPdfBase64 = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(formData.cvPdf);
+      });
+    }
+
     try {
       const response = await fetch(`${API_URL}/api/auth/register-medico`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              nombre: formData.nombre ,
-              apellido: formData.apellido,
-              dpi: formData.dpi,
-              fecha_nacimiento: formData.fechaNacimiento,
-              genero: formData.genero,
-              direccion: formData.direccion ,
-              telefono: formData.telefono,
-              fotografia: fotografiaBase64,
-              numero_colegiado: formData.numeroColegiado,
-              especialidad: formData.especialidad,
-              direccion_clinica: formData.direccionClinica,
-              correo: formData.correo,
-              password: formData.contrasena
-            })
-          });
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre: formData.nombre,
+          apellido: formData.apellido,
+          dpi: formData.dpi,
+          fecha_nacimiento: formData.fechaNacimiento,
+          genero: formData.genero,
+          direccion: formData.direccion,
+          telefono: formData.telefono,
+          fotografia: fotografiaBase64,
+          numero_colegiado: formData.numeroColegiado,
+          especialidad: formData.especialidad,
+          direccion_clinica: formData.direccionClinica,
+          correo: formData.correo,
+          password: formData.contrasena,
+          cv_pdf: cvPdfBase64
+        })
+      });
 
-          const data = await response.json();
-          console.log(formData.fotografia);
-
-          if (!response.ok) {
-            setErrorPassword('Error al registrar');
-            return;
-          }
-    
-          setRegistroExitoso(true);
-
-          //alert('Paciente registrado correctamente! Tu cuenta está pendiente de aprobación.');
-        
-        } catch (error) {
-          console.log(error);
-        }
-
+      const data = await response.json();
+      if (!response.ok) {
+        setErrorPassword('Error al registrar');
+        return;
+      }
+      setRegistroExitoso(true);
+    } catch (error) {
+      console.log(error);
+    }
   };
 
   if (registroExitoso) {
     return (
       <div className="formulario-contenedor">
         <h2>Registro exitoso ✅</h2>
-        
         <p style={{ marginTop: '15px', color: '#555' }}>
           Tu cuenta ha sido enviada al administrador para su aprobación.
         </p>
-
-        <Link 
-          to="/" 
-          style={{
-            display: "inline-block",
-            marginTop: "20px",
-            color: "#0056b3",
-            textDecoration: "underline",
-            cursor: "pointer"
-          }}
-        >
+        <Link to="/" style={{ display: "inline-block", marginTop: "20px", color: "#0056b3", textDecoration: "underline", cursor: "pointer" }}>
           Volver al inicio
         </Link>
       </div>
     );
   }
-  
+
   return (
     <div className="formulario-contenedor">
       <h2>Registro de Médico</h2>
@@ -135,6 +123,9 @@ function RegistroMedico() {
         <input type="text" name="direccionClinica" placeholder="Dirección de la Clínica" onChange={handleChange} required />
         
         <input type="email" name="correo" placeholder="Correo Electrónico" onChange={handleChange} required />
+        
+        <label>CV en PDF (Obligatorio):</label>
+        <input type="file" name="cvPdf" accept="application/pdf" onChange={handleChange} required />
         
         <input type="password" name="contrasena" placeholder="Contraseña" onChange={handleChange} required />
         {errorPassword && <p style={{color: 'red', fontSize: '12px'}}>{errorPassword}</p>}

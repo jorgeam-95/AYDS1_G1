@@ -16,3 +16,4 @@ class MedicoCreate(BaseModel):
     direccion_clinica: str
     correo: EmailStr
     password: str
+    cv_pdf: Optional[str] = None
