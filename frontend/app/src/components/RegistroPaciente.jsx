@@ -1,33 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from "react-router-dom";
 export const API_URL = import.meta.env.VITE_URL_BASE;
 
 function RegistroPaciente() {
-  const [ registroExitoso, setRegistroExitoso ] = useState(false);
+  const [registroExitoso, setRegistroExitoso] = useState(false);
   const [formData, setFormData] = useState({
     nombre: '', apellido: '', dpi: '', genero: '', direccion: '',
     telefono: '', fechaNacimiento: '', fotografia: null,
-    correo: '', contrasena: ''
+    dpiPdf: null, correo: '', contrasena: ''
   });
   const [errorPassword, setErrorPassword] = useState('');
 
   const handleChange = (e) => {
     const { name, value, files } = e.target;
-    setFormData({
-      ...formData,
-      [name]: files ? files[0] : value
-    });
+    setFormData({ ...formData, [name]: files ? files[0] : value });
   };
 
   const validarContrasena = (password) => {
-    // Regex: Mínimo 8 caracteres, 1 mayúscula, 1 minúscula, 1 número
     const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d\w\W]{8,}$/;
     return regex.test(password);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
     if (!validarContrasena(formData.contrasena)) {
       setErrorPassword('La contraseña debe tener mínimo 8 caracteres, una mayúscula, una minúscula y un número.');
       return;
@@ -40,6 +35,15 @@ function RegistroPaciente() {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result);
         reader.readAsDataURL(formData.fotografia);
+      });
+    }
+
+    let dpiPdfBase64 = null;
+    if (formData.dpiPdf) {
+      dpiPdfBase64 = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(formData.dpiPdf);
       });
     }
 
@@ -56,23 +60,20 @@ function RegistroPaciente() {
           telefono: formData.telefono,
           fecha_nacimiento: formData.fechaNacimiento,
           fotografia: fotografiaBase64,
+          dpi_pdf: dpiPdfBase64,
           correo: formData.correo,
           password: formData.contrasena
         })
       });
 
       const data = await response.json();
-
       if (!response.ok) {
         setErrorPassword(data.detail || 'Error al registrar');
         return;
       }
-
       setRegistroExitoso(true);
-      //alert('Paciente registrado correctamente! Tu cuenta está pendiente de aprobación.');
-    
     } catch (error) {
-      setErrorPassword('No se pudo conectar con el servidor. Verifica que esté corriendo. el backend');
+      setErrorPassword('No se pudo conectar con el servidor.');
     }
   };
 
@@ -80,21 +81,10 @@ function RegistroPaciente() {
     return (
       <div className="formulario-contenedor">
         <h2>Registro exitoso</h2>
-        
         <p style={{ marginTop: '15px', color: '#555' }}>
           Tu cuenta ha sido enviada al administrador para su aprobación.
         </p>
-
-        <Link 
-          to="/" 
-          style={{
-            display: "inline-block",
-            marginTop: "20px",
-            color: "#0056b3",
-            textDecoration: "underline",
-            cursor: "pointer"
-          }}
-        >
+        <Link to="/" style={{ display: "inline-block", marginTop: "20px", color: "#0056b3", textDecoration: "underline", cursor: "pointer" }}>
           Volver al inicio
         </Link>
       </div>
@@ -121,11 +111,13 @@ function RegistroPaciente() {
         <label>Fecha de Nacimiento:</label>
         <input type="date" name="fechaNacimiento" onChange={handleChange} required />
         
-        <label>Fotografía (Opcional):</label>
-        <input type="file" name="fotografia" accept="image/*" onChange={handleChange} />
+        <label>Fotografía Reciente (Obligatoria):</label>
+        <input type="file" name="fotografia" accept="image/*" onChange={handleChange} required />
+        
+        <label>DPI Escaneado en PDF (Obligatorio):</label>
+        <input type="file" name="dpiPdf" accept="application/pdf" onChange={handleChange} required />
         
         <input type="email" name="correo" placeholder="Correo Electrónico" onChange={handleChange} required />
-        
         <input type="password" name="contrasena" placeholder="Contraseña" onChange={handleChange} required />
         {errorPassword && <p style={{color: 'red', fontSize: '12px'}}>{errorPassword}</p>}
         

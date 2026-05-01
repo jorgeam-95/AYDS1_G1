@@ -12,5 +12,6 @@ class PatientCreate(BaseModel):
     telefono: str
     fecha_nacimiento: date
     fotografia: Optional[str] = None
+    dpi_pdf: Optional[str] = None
     correo: EmailStr
     password: str
