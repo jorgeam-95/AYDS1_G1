@@ -35,12 +35,12 @@ jobs:
 
       - name: Instalar dependencias del frontend
         run: |
-          cd frontend
+          cd frontend/app
           npm install
 
       - name: Build del frontend
         run: |
-          cd frontend
+          cd frontend/app
           npm run build
         env:
           REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL || 'http://localhost:5000/api' }}
@@ -102,12 +102,12 @@ jobs:
 
       - name: Instalar dependencias del frontend
         run: |
-          cd frontend
+          cd frontend/app
           npm install
 
       - name: Ejecutar pruebas del frontend (Jest)
         run: |
-          cd frontend
+          cd frontend/app
           npm test -- --watchAll=false --passWithNoTests
         env:
           CI: true
@@ -157,7 +157,7 @@ jobs:
 
       - name: Instalar y construir frontend
         run: |
-          cd frontend
+          cd frontend/app
           npm install
           npm run build
         env:
