@@ -32,13 +32,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: frontend/app/package-lock.json
 
       - name: Instalar dependencias del frontend
         run: |
           cd frontend
-          npm ci
+          npm install
 
       - name: Build del frontend
         run: |
@@ -101,13 +99,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: frontend/app/package-lock.json
 
       - name: Instalar dependencias del frontend
         run: |
           cd frontend
-          npm ci
+          npm install
 
       - name: Ejecutar pruebas del frontend (Jest)
         run: |
@@ -158,13 +154,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: frontend/app/package-lock.json
 
       - name: Instalar y construir frontend
         run: |
           cd frontend
-          npm ci
+          npm install
           npm run build
         env:
           REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL || 'http://localhost:5000/api' }}
